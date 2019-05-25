@@ -1,0 +1,12 @@
+<package>
+  <name>lsp-gst</name>
+  <namespace>LSP.GST</namespace>
+  <prereq>I18N</prereq>
+  <prereq>Parser</prereq>
+  <prereq>Compiler</prereq>
+  <filein>lib/json.st</filein>
+  <filein>lsp-io.st</filein>
+  <filein>lsp-state.st</filein>
+  <filein>lsp-handlers.st</filein>
+  <filein>lsp-gst.st</filein>
+</package>
