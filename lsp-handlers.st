@@ -9,6 +9,7 @@ Object subclass: InitializeHandler [
             'capabilities' -> (Dictionary from: {
                 'textDocumentSync' -> (Dictionary from: {
                     'openClose' -> true.
+                    'change' -> 1.
                 }).
             }).
         }.
@@ -24,7 +25,7 @@ Object subclass: ShutdownHandler [
 Object subclass: TextDocumentOpenHandler [
     TextDocumentOpenHandler class >> handle: params [
         Workspace singleton documents at: ((params at: 'textDocument') at: 'uri') put: (Dictionary from: {
-            'text' -> (((params at: 'textDocument') at: 'text') lines).
+            'text' -> ((params at: 'textDocument') at: 'text').
             'version' -> ((params at: 'textDocument') at: 'version').
         }).
         ^nil.
@@ -33,6 +34,29 @@ Object subclass: TextDocumentOpenHandler [
 
 Object subclass: TextDocumentChangeHandler [
     TextDocumentChangeHandler class >> handle: params [
+        | docParams |
+        docParams := params at: 'textDocument'.
+        ((params at: 'version') > (docParams at: 'version')) ifTrue: [
+            Workspace singleton documents at: (docParams at: 'uri') put: (Dictionary from: {
+                'text' -> (docParams at: 'text').
+                'version' -> (docParams at: 'version').
+            }).
+        ].
+        ^nil.
+    ]
+]
+
+Object subclass: TextDocumentSaveHandler [
+    TextDocumentSaveHandler class >> handle: params [
+        | docParams |
+        docParams := params at: 'textDocument'.
+        ((params at: 'version') > (docParams at: 'version')) ifTrue: [
+            Workspace singleton documents at: (docParams at: 'uri') put: (Dictionary from: {
+                'text' -> (docParams at: 'text').
+                'version' -> (docParams at: 'version').
+            }).
+        ].
+        ^nil.
     ]
 ]
 
@@ -41,6 +65,8 @@ Object subclass: MessageDispatcher [
         'initialize' -> InitializeHandler.
         'shutdown' -> ShutdownHandler.
         'textDocument/didOpen' -> TextDocumentOpenHandler.
+        'textDocument/didChange' -> TextDocumentChangeHandler.
+        'textDocument/didSave' -> TextDocumentSaveHandler.
     }.
 
     MessageDispatcher class >> dispatch: message [
