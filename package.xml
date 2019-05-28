@@ -8,5 +8,6 @@
   <filein>lsp-io.st</filein>
   <filein>lsp-state.st</filein>
   <filein>lsp-handlers.st</filein>
+  <filein>lsp-language.st</filein>
   <filein>lsp-gst.st</filein>
 </package>

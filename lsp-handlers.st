@@ -5,7 +5,7 @@ Object subclass: InitializeHandler [
             Workspace singleton folders add: folder.
         ].
 
-        ^Dictionary from: {
+        ^HandlerResponse from: {
             'capabilities' -> (Dictionary from: {
                 'textDocumentSync' -> (Dictionary from: {
                     'openClose' -> true.
@@ -16,9 +16,39 @@ Object subclass: InitializeHandler [
     ]
 ]
 
+Object subclass: HandlerResponse [
+    HandlerResponse class >> from: anAssociationArray [
+        ^Dictionary from: {
+            'response' -> (Dictionary from: anAssociationArray).
+            'notifications' -> {}.
+        }.
+    ]
+
+    HandlerResponse class >> from: anAssociationArray with: notifications [
+        ^Dictionary from: {
+            'response' -> (Dictionary from: anAssociationArray).
+            'notifications' -> notifications.
+        }.
+    ]
+
+    HandlerResponse class >> with: notifications [
+        ^Dictionary from: {
+            'response' -> nil.
+            'notifications' -> notifications.
+        }.
+    ]
+
+    HandlerResponse class >> none [
+        ^Dictionary from: {
+            'response' -> nil.
+            'notifications' -> {}.
+        }.
+    ]
+]
+
 Object subclass: ShutdownHandler [
     ShutdownHandler class >> handle: params [
-        ^nil.
+        ^HandlerResponse none.
     ]
 ]
 
@@ -28,35 +58,69 @@ Object subclass: TextDocumentOpenHandler [
             'text' -> ((params at: 'textDocument') at: 'text').
             'version' -> ((params at: 'textDocument') at: 'version').
         }).
-        ^nil.
+        ^HandlerResponse none.
     ]
 ]
 
 Object subclass: TextDocumentChangeHandler [
     TextDocumentChangeHandler class >> handle: params [
-        | docParams |
-        docParams := params at: 'textDocument'.
-        ((params at: 'version') > (docParams at: 'version')) ifTrue: [
-            Workspace singleton documents at: (docParams at: 'uri') put: (Dictionary from: {
-                'text' -> (docParams at: 'text').
-                'version' -> (docParams at: 'version').
-            }).
+        | doc |
+        doc := Workspace singleton documents at: ((params at: 'textDocument') at: 'uri').
+        ((doc at: 'version') < ((params at: 'textDocument') at: 'version')) ifTrue: [
+            | errors |
+
+
+            doc at: 'text' put: (((params at: 'contentChanges') at: 1) at: 'text').
+            doc at: 'version' put: ((params at: 'textDocument') at: 'version').
+            errors := (ParserService errors: (doc at: 'text')) collect: [:lineAndMsg |
+                | line message |
+
+                line := lineAndMsg at: 1.
+                message := lineAndMsg at: 2.
+
+                Dictionary from: {
+                    'range' -> (Dictionary from: {
+                        'start' -> (Dictionary from: {'line' -> line. 'character' -> 0.}).
+                        'end' -> (Dictionary from: {'line' -> (line + 1). 'character' -> 0.}).
+                    }).
+                    'severity' -> 1.
+                    'source' -> 'gst'.
+                    'message' -> message.
+                }.
+            ].
+
+            ^HandlerResponse with: {(Dictionary from: {
+                'method' -> 'textDocument/publishDiagnostics'.
+                'params' -> (Dictionary from: {
+                    'uri' -> ((params at: 'textDocument') at: 'uri').
+                    'diagnostics' -> errors.
+                 }).
+            })}.
         ].
-        ^nil.
     ]
 ]
 
 Object subclass: TextDocumentSaveHandler [
     TextDocumentSaveHandler class >> handle: params [
-        | docParams |
-        docParams := params at: 'textDocument'.
-        ((params at: 'version') > (docParams at: 'version')) ifTrue: [
-            Workspace singleton documents at: (docParams at: 'uri') put: (Dictionary from: {
-                'text' -> (docParams at: 'text').
-                'version' -> (docParams at: 'version').
-            }).
-        ].
-        ^nil.
+        " | old new | "
+        " new := params at: 'textDocument'. "
+        " old := Workspace singleton documents at: (new at: 'uri'). "
+        " ((old at: 'version') < (new at: 'version')) ifTrue: [ "
+        "     | errors | "
+        "     old put: (Dictionary from: { "
+        "         'text' -> (new at: 'text'). "
+        "         'version' -> (new at: 'version'). "
+        "     }). "
+        " ]. "
+        ^HandlerResponse none.
+    ]
+]
+
+Object subclass: CompletionHandler [
+    CompletionHandler class >> handle: params [
+        ^(Array with: (Dictionary from: {
+            'label' -> 'hi'.
+        })).
     ]
 ]
 
@@ -71,8 +135,8 @@ Object subclass: MessageDispatcher [
 
     MessageDispatcher class >> dispatch: message [
         ^(dispatch at: (message at: 'method') ifAbsent: [
-            ('lsp-gst: message not understood: ', (message at: 'method')) displayOn: (FileStream stderr).
-            ^nil.
+            ('lsp-gst: message not understood: ', (message at: 'method'), (String with: Character lf)) displayOn: (FileStream stderr).
+            ^HandlerResponse none.
         ]) handle: (message at: 'params')
     ]
 ]

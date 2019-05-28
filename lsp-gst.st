@@ -7,15 +7,24 @@ Eval [
         reader nextMessage ifNotNil: [:message |
             | response |
 
-            ('->', (message body asJSON), (String with: Character lf)) displayOn: (FileStream stderr).
+            (((message body includesKey: 'id') ifTrue: ['-R>'] ifFalse: ['-N>']), (message body asJSON), (String with: Character lf)) displayOn: (FileStream stderr).
             FileStream stderr flush.
 
-            response := (MessageDispatcher dispatch: message body).
+            [response := (MessageDispatcher dispatch: message body)]
+                on: Error
+                do: [].
 
-            ('<-', (response asJSON), (String with: Character lf)) displayOn: (FileStream stderr).
-            FileStream stderr flush.
+            (message body includesKey: 'id') ifTrue: [
+                ('<R-', ((response at: 'response') asJSON), (String with: Character lf)) displayOn: (FileStream stderr).
+                FileStream stderr flush.
+            ].
 
-            writer respondTo: (message body) with: response.
+            writer respondTo: (message body) with: (response at: 'response').
+
+            (response at: 'notifications') do: [:notification |
+                ('<N-', ((response at: 'response') asJSON), (String with: Character lf)) displayOn: (FileStream stderr).
+                writer notify: (notification at: 'method') with: (notification at: 'params').
+            ].
         ].
     ]
 ]
